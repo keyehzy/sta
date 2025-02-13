@@ -18,6 +18,11 @@
 struct Blade {
     float coefficient;
     uint64_t mask;
+
+    friend std::ostream& operator<<(std::ostream& os, const Blade &b) {
+        os << b.coefficient << " * e(" << b.mask << ")";
+        return os;
+    }
 };
 
 template <size_t Dimension>
@@ -123,10 +128,8 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Multivector &v) {
-        if (!v.m_blades.empty()) {
-            for (const auto &b : v.m_blades) {
-                os << b.coefficient << " * e(" << b.mask << ")\n";
-            }
+        for (size_t i = 0; i < v.m_blades.size(); i++) {
+            os << v.m_blades[i] << (i < v.m_blades.size() - 1 ? "\n" : "");
         }
         return os;
     }
@@ -149,6 +152,8 @@ private:
 
     static constexpr int32_t sign(uint64_t a, uint64_t b) {
         uint64_t parity = blade_parity(a, b);
+
+        // Extra code necessary for handling different metrics
         uint64_t repeated = a & b;
         while (repeated) {
             uint64_t i = __builtin_ctzll(repeated);
@@ -200,8 +205,8 @@ int main() {
 
     std::cout << "\nTrivectors:" << std::endl;
     for (size_t i = 0; i < basis.size(); ++i) {
-        for (size_t j = i+1; j < basis.size(); ++j) {
-            for (size_t k = j+1; k < basis.size(); ++k) {
+        for (size_t j = i; j < basis.size(); ++j) {
+            for (size_t k = j; k < basis.size(); ++k) {
                 std::cout << "e" << i + 1 << " * e" << j + 1 << " * e" << k + 1
                     << " = " << (basis[i] * basis[j] * basis[k]) << std::endl;
             }
