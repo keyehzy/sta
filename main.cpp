@@ -14,20 +14,47 @@
 #include <ostream>
 #include <iostream>
 
-// https://en.wikipedia.org/wiki/Geometric_algebra#Blades,_grades,_and_basis
-
 struct Blade {
-    uint64_t mask;
     float coefficient;
+    uint64_t mask;
 };
 
 class Multivector {
 public:
+    static Multivector create(const std::initializer_list<Blade>& blades) {
+        Multivector v;
+        for (const auto &b : blades) {
+            v.add_blade(b.coefficient, b.mask);
+        }
+        return v;
+    }
+
+    static Multivector basis_vector(uint64_t i) {
+        Multivector v;
+        v.add_blade(1.0f, 1ULL << i);
+        return v;
+    }
 
     Multivector operator+(const Multivector &other) const {
         Multivector result = *this;
         for (const auto &b : other.m_blades) {
-            result.add_blade(b.mask, b.coefficient);
+            result.add_blade(b.coefficient, b.mask);
+        }
+        return result;
+    }
+
+    Multivector operator-(const Multivector &other) const {
+        Multivector result = *this;
+        for (const auto &b : other.m_blades) {
+            result.add_blade(-b.coefficient, b.mask);
+        }
+        return result;
+    }
+
+    Multivector operator*(float scalar) const {
+        Multivector result;
+        for (const auto &b : m_blades) {
+            result.add_blade(scalar * b.coefficient, b.mask);
         }
         return result;
     }
@@ -39,16 +66,33 @@ public:
                 uint64_t new_mask = a.mask ^ b.mask;
                 int32_t s = blade_sign(a.mask, b.mask);
                 float new_coeff = a.coefficient * b.coefficient * s;
-                result.add_blade(new_mask, new_coeff);
+                result.add_blade(new_coeff, new_mask);
             }
         }
         return result;
     }
 
-    static Multivector basis_vector(uint64_t i) {
-        Multivector v;
-        v.add_blade(1ULL << i, 1.0f);
-        return v;
+    Multivector reverse() const {
+        Multivector result;
+        for (const auto &b : m_blades) {
+            uint64_t grade = __builtin_popcountll(b.mask);
+            uint64_t parity = (grade * (grade - 1) / 2) % 2;
+            int sign = 1 - 2 * parity;
+            result.add_blade(b.coefficient * sign, b.mask);
+        }
+        return result;
+    }
+
+    static Multivector commutator(const Multivector &A, const Multivector &B) {
+        return A * B - B * A;
+    }
+
+    static Multivector anticommutator(const Multivector &A, const Multivector &B) {
+        return A * B + B * A;
+    }
+
+    friend Multivector operator*(float scalar, const Multivector& v) {
+        return v * scalar;
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Multivector &v) {
@@ -61,7 +105,9 @@ public:
     }
 
 private:
-    void add_blade(uint64_t mask, float coeff) {
+    Multivector() = default;
+
+    void add_blade(float coeff, uint64_t mask) {
         if (coeff == 0.0f) {
             return;
         }
@@ -71,10 +117,10 @@ private:
                 return;
             }
         }
-        m_blades.push_back({mask, coeff});
+        m_blades.push_back({coeff, mask});
     }
 
-    static constexpr int32_t blade_sign(uint64_t a, uint64_t b) {
+    static constexpr int32_t blade_sign(uint64_t a, uint64_t b) noexcept {
         uint64_t parity = 0;
         while (b) {
             uint64_t lowest_set_bit = __builtin_ctzll(b);
