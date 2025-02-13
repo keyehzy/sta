@@ -15,16 +15,6 @@
 #include <iostream>
 #include <cassert>
 
-struct Blade {
-    float coefficient;
-    uint64_t mask;
-
-    friend std::ostream& operator<<(std::ostream& os, const Blade &b) {
-        os << b.coefficient << " * e(" << b.mask << ")";
-        return os;
-    }
-};
-
 template <size_t Dimension>
 struct EuclideanSignature {
     static constexpr size_t max_dimension() {
@@ -51,6 +41,17 @@ struct MinkowskiSignature {
 
 template <class Signature>
 class Multivector {
+private:
+    struct Blade {
+        float coefficient;
+        uint64_t mask;
+
+        friend std::ostream& operator<<(std::ostream& os, const Blade &b) {
+            os << b.coefficient << " * e(" << b.mask << ")";
+            return os;
+        }
+    };
+
 public:
     static Multivector create(const std::initializer_list<Blade>& blades) {
         Multivector v;
