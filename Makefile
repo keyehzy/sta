@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -Wall -Wextra -O2 -std=c++20
+CXXFLAGS := -Wall -Wextra -g -O2 -std=c++20
 
 TARGET   := multivector
 SRCS     := main.cpp

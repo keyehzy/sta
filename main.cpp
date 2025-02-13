@@ -20,6 +20,31 @@ struct Blade {
     uint64_t mask;
 };
 
+template <size_t Dimension>
+struct EuclideanSignature {
+    static constexpr size_t max_dimension() {
+        return Dimension;
+    }
+
+    static constexpr uint32_t value(std::size_t) {
+        return 1;
+    }
+};
+
+struct MinkowskiSignature {
+    static constexpr int32_t signature[4] = {1, 0, 0, 0};
+
+    static constexpr size_t max_dimension() {
+        return 4;
+    }
+
+    static constexpr int32_t value(size_t i) {
+        assert(i < max_dimension() && "Index outside of signature bounds");
+        return signature[i];
+    }
+};
+
+template <class Signature>
 class Multivector {
 public:
     static Multivector create(const std::initializer_list<Blade>& blades) {
@@ -31,7 +56,7 @@ public:
     }
 
     static Multivector basis_vector(uint64_t i) {
-        assert(i < max_dimension && "Basis vector index exceed maximum value");
+        assert(i < Signature::max_dimension() && "Basis vector index exceed maximum value");
         Multivector v;
         v.add_blade(1.0f, 1ULL << i);
         return v;
@@ -66,7 +91,7 @@ public:
         for (const auto &a : m_blades) {
             for (const auto &b : other.m_blades) {
                 uint64_t new_mask = a.mask ^ b.mask;
-                int32_t s = blade_sign(a.mask, b.mask);
+                int32_t s = sign(a.mask, b.mask);
                 float new_coeff = a.coefficient * b.coefficient * s;
                 result.add_blade(new_coeff, new_mask);
             }
@@ -122,7 +147,18 @@ private:
         m_blades.push_back({coeff, mask});
     }
 
-    static constexpr int32_t blade_sign(uint64_t a, uint64_t b) noexcept {
+    static constexpr int32_t sign(uint64_t a, uint64_t b) {
+        uint64_t parity = blade_parity(a, b);
+        uint64_t repeated = a & b;
+        while (repeated) {
+            uint64_t i = __builtin_ctzll(repeated);
+            parity ^= Signature::value(i);
+            repeated &= (repeated - 1);
+        }
+        return 2 * parity - 1;
+    }
+
+    static constexpr uint64_t blade_parity(uint64_t a, uint64_t b) {
         uint64_t parity = 0;
         while (b) {
             uint64_t lowest_set_bit = __builtin_ctzll(b);
@@ -130,18 +166,23 @@ private:
             parity ^= count_bits_below & 1;
             b &= b - 1;
         }
-        return 1 - 2 * (parity & 1);
+        return parity & 1;
     }
 
+private:
     std::vector<Blade> m_blades;
-    static constexpr uint32_t max_dimension = 64;
 };
 
+using CliffordMultivector = Multivector<EuclideanSignature<64>>;
+using EuclideanMultivector = Multivector<EuclideanSignature<4>>;
+using SpacetimeMultivector = Multivector<MinkowskiSignature>;
+
 int main() {
-    std::vector<Multivector> basis = {
-        Multivector::basis_vector(0),
-        Multivector::basis_vector(1),
-        Multivector::basis_vector(2),
+    std::vector<SpacetimeMultivector> basis = {
+        SpacetimeMultivector::basis_vector(0),
+        SpacetimeMultivector::basis_vector(1),
+        SpacetimeMultivector::basis_vector(2),
+        SpacetimeMultivector::basis_vector(3),
     };
 
     std::cout << "Basis Vectors:" << std::endl;
@@ -149,16 +190,26 @@ int main() {
         std::cout << "e" << i + 1 << ": " << basis[i] << std::endl;
     }
 
-    std::cout << "\nGeometric Products of Basis Vectors:" << std::endl;
+    std::cout << "\nBivectors:" << std::endl;
     for (size_t i = 0; i < basis.size(); ++i) {
-        for (size_t j = 0; j < basis.size(); ++j) {
+        for (size_t j = i; j < basis.size(); ++j) {
             std::cout << "e" << i + 1 << " * e" << j + 1 
                 << " = " << (basis[i] * basis[j]) << std::endl;
         }
     }
 
-    std::cout << "\nPseudoscalar (e1 * e2 * e3):" << std::endl;
-    std::cout << basis[0] * basis[1] * basis[2] << std::endl;
+    std::cout << "\nTrivectors:" << std::endl;
+    for (size_t i = 0; i < basis.size(); ++i) {
+        for (size_t j = i+1; j < basis.size(); ++j) {
+            for (size_t k = j+1; k < basis.size(); ++k) {
+                std::cout << "e" << i + 1 << " * e" << j + 1 << " * e" << k + 1
+                    << " = " << (basis[i] * basis[j] * basis[k]) << std::endl;
+            }
+        }
+    }
+
+    std::cout << "\nPseudoscalar (e1 * e2 * e3 * e4):" << std::endl;
+    std::cout << basis[0] * basis[1] * basis[2] * basis[3] << std::endl;
 
     return 0;
 }
