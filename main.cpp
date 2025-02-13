@@ -1,0 +1,115 @@
+/**
+ * Geometric Algebra Multivector Implementation
+ *
+ * This program demonstrates a simple implementation of geometric algebra
+ * multivectors. The Multivector class supports addition and the geometric product.
+ *
+ * For more details on geometric algebra, see:
+ * https://en.wikipedia.org/wiki/Geometric_algebra#Blades,_grades,_and_basis
+ */
+
+#include <vector>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
+#include <iostream>
+
+// https://en.wikipedia.org/wiki/Geometric_algebra#Blades,_grades,_and_basis
+
+struct Blade {
+    uint64_t mask;
+    float coefficient;
+};
+
+class Multivector {
+public:
+
+    Multivector operator+(const Multivector &other) const {
+        Multivector result = *this;
+        for (const auto &b : other.m_blades) {
+            result.add_blade(b.mask, b.coefficient);
+        }
+        return result;
+    }
+
+    Multivector operator*(const Multivector &other) const {
+        Multivector result;
+        for (const auto &a : m_blades) {
+            for (const auto &b : other.m_blades) {
+                uint64_t new_mask = a.mask ^ b.mask;
+                int32_t s = blade_sign(a.mask, b.mask);
+                float new_coeff = a.coefficient * b.coefficient * s;
+                result.add_blade(new_mask, new_coeff);
+            }
+        }
+        return result;
+    }
+
+    static Multivector basis_vector(uint64_t i) {
+        Multivector v;
+        v.add_blade(1ULL << i, 1.0f);
+        return v;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Multivector &v) {
+        if (!v.m_blades.empty()) {
+            for (const auto &b : v.m_blades) {
+                os << b.coefficient << " * e(" << b.mask << ")\n";
+            }
+        }
+        return os;
+    }
+
+private:
+    void add_blade(uint64_t mask, float coeff) {
+        if (coeff == 0.0f) {
+            return;
+        }
+        for (auto &b : m_blades) {
+            if (b.mask == mask) {
+                b.coefficient += coeff;
+                return;
+            }
+        }
+        m_blades.push_back({mask, coeff});
+    }
+
+    static constexpr int32_t blade_sign(uint64_t a, uint64_t b) {
+        uint64_t parity = 0;
+        while (b) {
+            uint64_t lowest_set_bit = __builtin_ctzll(b);
+            uint64_t count_bits_below = __builtin_popcountll(a & ((1ull << lowest_set_bit) - 1));
+            parity ^= count_bits_below & 1;
+            b &= b - 1;
+        }
+        return 1 - 2 * (parity & 1);
+    }
+
+    std::vector<Blade> m_blades;
+};
+
+int main() {
+    std::vector<Multivector> basis = {
+        Multivector::basis_vector(0),
+        Multivector::basis_vector(1),
+        Multivector::basis_vector(2),
+    };
+
+    std::cout << "Basis Vectors:" << std::endl;
+    for (size_t i = 0; i < basis.size(); ++i) {
+        std::cout << "e" << i + 1 << ": " << basis[i] << std::endl;
+    }
+
+    std::cout << "\nGeometric Products of Basis Vectors:" << std::endl;
+    for (size_t i = 0; i < basis.size(); ++i) {
+        for (size_t j = 0; j < basis.size(); ++j) {
+            std::cout << "e" << i + 1 << " * e" << j + 1 
+                << " = " << (basis[i] * basis[j]) << std::endl;
+        }
+    }
+
+    std::cout << "\nPseudoscalar (e1 * e2 * e3):" << std::endl;
+    std::cout << basis[0] * basis[1] * basis[2] << std::endl;
+
+    return 0;
+}
