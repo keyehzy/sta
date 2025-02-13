@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <ostream>
 #include <iostream>
+#include <cassert>
 
 struct Blade {
     float coefficient;
@@ -30,6 +31,7 @@ public:
     }
 
     static Multivector basis_vector(uint64_t i) {
+        assert(i < max_dimension && "Basis vector index exceed maximum value");
         Multivector v;
         v.add_blade(1.0f, 1ULL << i);
         return v;
@@ -77,7 +79,7 @@ public:
         for (const auto &b : m_blades) {
             uint64_t grade = __builtin_popcountll(b.mask);
             uint64_t parity = (grade * (grade - 1) / 2) % 2;
-            int sign = 1 - 2 * parity;
+            int32_t sign = 1 - 2 * parity;
             result.add_blade(b.coefficient * sign, b.mask);
         }
         return result;
@@ -124,7 +126,7 @@ private:
         uint64_t parity = 0;
         while (b) {
             uint64_t lowest_set_bit = __builtin_ctzll(b);
-            uint64_t count_bits_below = __builtin_popcountll(a & ((1ull << lowest_set_bit) - 1));
+            uint64_t count_bits_below = __builtin_popcountll(a & ((1ULL << lowest_set_bit) - 1));
             parity ^= count_bits_below & 1;
             b &= b - 1;
         }
@@ -132,6 +134,7 @@ private:
     }
 
     std::vector<Blade> m_blades;
+    static constexpr uint32_t max_dimension = 64;
 };
 
 int main() {
